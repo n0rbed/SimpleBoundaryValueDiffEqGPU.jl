@@ -32,25 +32,6 @@ using SimpleBoundaryValueDiffEq: __extract_details, alg_stage, SimpleMIRK4, cons
 end
 
 
-@views function Φ!(residual, y, mesh, discrete_stages, c, v, b, x, prob, dt)
-    for i in 1:(length(mesh) - 1)
-        for r in eachindex(discrete_stages)
-            x_temp = mesh[i] + c[r] * dt
-            y_temp = (1 - v[r]) * y[i] + v[r] * y[i + 1]
-            if r > 1
-                y_temp += dt * sum(j -> x[r, j] * discrete_stages[j], 1:(r - 1))
-            end
-            prob.f(discrete_stages[r], y_temp, prob.p, x_temp)
-        end
-
-        residual[i] = y[i + 1] - y[i] -
-                      dt * sum(j -> b[j] * discrete_stages[j], 1:length(discrete_stages))
-    end
-end
-
-
-
-
 ###### Example of how the input to the kernel looks like ######
 
 alg = SimpleMIRK4()
@@ -64,7 +45,7 @@ iip = SciMLBase.isinplace(prob)
 pt = prob.problem_type
 c, v, b, x = constructSimpleMIRK(alg)
 
-# CPU data
+# usual CPU data, copied from SimpleBoundaryValueDiffEq
 stage = alg_stage(alg)
 M, u0, guess = __extract_details(prob, N)
 resid = [similar(u0) for _ in 1:(N + 1)]
@@ -85,6 +66,6 @@ len_mesh = length(mesh)
 
 k = reskernel!(get_backend(gpu_resid))
 k(gpu_resid, y_flat, gpu_mesh, len_mesh, gpu_stages, n_stage,
-    gpu_c,gpu_v,gpu_b,gpu_x,dt,size_u, ndrange=len_mesh-1)
+    gpu_c, gpu_v, gpu_b, gpu_x, dt, size_u, ndrange=len_mesh-1)
 
 
